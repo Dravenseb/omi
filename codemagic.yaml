@@ -6,7 +6,7 @@
 # Variables à créer dans Codemagic (groupe `pendant`, TOUTES chiffrées) :
 #   OMI_API_BASE_URL   ex. https://<ton-domaine>.ngrok-free.app/   (slash final obligatoire)
 #   GOOGLE_INFO_PLIST  le GoogleService-Info.plist encodé en base64
-#   BUNDLE_ID          ex. com.tonnom.pendant  (doit correspondre à ios_signing ci-dessous)
+#   BUNDLE_ID          ex. com.tonnom.pendant  (les cibles annexes en derivent : .widget, .watchapp)
 
 workflows:
   pendant-testflight:
@@ -17,12 +17,9 @@ workflows:
       # Nom donné à la clé API App Store Connect dans Codemagic (Teams > Integrations).
       app_store_connect: pendant_limitless
     environment:
-      ios_signing:
-        distribution_type: app_store
-        # Valeur en dur volontairement : Codemagic ne substitue pas les
-        # variables dans ce bloc, lu avant l'exécution des scripts. Un
-        # placeholder ici casse la signature ("No matching profiles found").
-        bundle_identifier: com.dravenseb.pendant
+      # Pas de bloc ios_signing : la signature automatique ne traite qu'un seul
+      # bundle ID et ne cree pas les profils manquants. Elle est faite
+      # explicitement dans l'etape « Signature iOS ».
       groups:
         - pendant
       flutter: 3.44.5
@@ -66,10 +63,25 @@ workflows:
       - name: CocoaPods
         script: cd ios && pod install --repo-update
 
+      - name: Signature iOS
+        script: |
+          set -e
+          keychain initialize
+          # Le build embarque trois applications : l'app, l'extension widget
+          # (BatteryWidget) et l'app Watch (omiWatchApp), toutes deux integrees
+          # au Runner. On recupere donc les trois profils explicitement ;
+          # --create les cree au besoin, ainsi que le certificat de
+          # distribution s'il n'existe pas encore sur le compte.
+          for ID in "$BUNDLE_ID" "$BUNDLE_ID.widget" "$BUNDLE_ID.watchapp"; do
+            echo "== profil pour $ID"
+            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --create
+          done
+          keychain add-certificates
+          xcode-project use-profiles
+
       - name: Build IPA
         script: |
           set -e
-          xcode-project use-profiles
           # OMI_SELF_HOSTED désactive validateStartupRouting, qui sinon lève un
           # StateError car l'URL ne correspond pas à celle du profil `production`.
           flutter build ipa \
