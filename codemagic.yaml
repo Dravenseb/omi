@@ -7,6 +7,9 @@
 #   OMI_API_BASE_URL   ex. https://<ton-domaine>.ngrok-free.app/   (slash final obligatoire)
 #   GOOGLE_INFO_PLIST  le GoogleService-Info.plist encodé en base64
 #   BUNDLE_ID          ex. com.tonnom.pendant  (les cibles annexes en derivent : .widget, .watchapp)
+#   CERTIFICATE_PRIVATE_KEY  cle privee RSA au format PEM, generee une fois et
+#                            conservee telle quelle : elle identifie le
+#                            certificat de distribution Apple
 
 workflows:
   pendant-testflight:
@@ -79,10 +82,13 @@ workflows:
           # (BatteryWidget) et l'app Watch (omiWatchApp), toutes deux integrees
           # au Runner. On recupere donc les trois profils explicitement ;
           # --create les cree au besoin, ainsi que le certificat de
-          # distribution s'il n'existe pas encore sur le compte.
+          # distribution s'il n'existe pas encore sur le compte. Ce dernier
+          # exige une cle privee RSA : elle doit rester identique d'un build a
+          # l'autre, sinon chaque build cree un certificat de plus et Apple en
+          # limite le nombre a trois par compte.
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.widget" "$BUNDLE_ID.watchapp"; do
             echo "== profil pour $ID"
-            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --create
+            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --certificate-key=@env:CERTIFICATE_PRIVATE_KEY --create
           done
           keychain add-certificates
           xcode-project use-profiles
