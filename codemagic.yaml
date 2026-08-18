@@ -38,8 +38,16 @@ workflows:
         script: |
           set -e
           echo "$GOOGLE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          # Une phase de script du projet Xcode recopie Config/<flavor>/ par-dessus
+          # Runner/ selon la configuration ; en Release-prod, sans ce dossier le
+          # `cp` echoue et fait tomber le build.
+          mkdir -p ios/Config/Prod ios/Config/Dev
+          cp ios/Runner/GoogleService-Info.plist ios/Config/Prod/
+          cp ios/Runner/GoogleService-Info.plist ios/Config/Dev/
           # Custom.xcconfig porte GOOGLE_REVERSE_CLIENT_ID, requis par la connexion Google.
           sh scripts/generate_ios_custom_config.sh ios/Runner/GoogleService-Info.plist ios/Flutter/
+          # main.dart importe firebase_options_prod.dart, absent du depot.
+          sh scripts/gen_firebase_options_prod.sh ios/Runner/GoogleService-Info.plist lib/firebase_options_prod.dart
           # envied lit app/.env au build_runner ; sans ce fichier la génération échoue.
           echo "API_BASE_URL=$OMI_API_BASE_URL" > .env
           echo "GOOGLE_MAPS_API_KEY=" >> .env
