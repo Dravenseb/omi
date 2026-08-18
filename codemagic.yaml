@@ -19,9 +19,10 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        # Remplacer par le bundle ID réel : Codemagic ne substitue pas les
-        # variables dans ce bloc, il est lu avant l'exécution des scripts.
-        bundle_identifier: com.CHANGEME.pendant
+        # Valeur en dur volontairement : Codemagic ne substitue pas les
+        # variables dans ce bloc, lu avant l'exécution des scripts. Un
+        # placeholder ici casse la signature ("No matching profiles found").
+        bundle_identifier: com.dravenseb.pendant
       groups:
         - pendant
       flutter: 3.44.5
