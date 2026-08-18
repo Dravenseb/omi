@@ -23,6 +23,10 @@ abstract class Env {
   static String? _agentProxyWsUrlOverride;
   static bool isTestFlight = false;
 
+  /// Backend self-hosté : désactive le verrouillage d'URL de
+  /// [validateStartupRouting], qui exige l'URL du profil `production`.
+  static const selfHosted = bool.fromEnvironment('OMI_SELF_HOSTED');
+
   static AppEnvironmentProfile get profile => AppEnvironmentProfile.forFlavor(
         productionFlavor: F.env == Environment.prod,
       );
@@ -109,6 +113,7 @@ abstract class Env {
     AppEnvironmentProfile? configuredProfile,
     bool releaseBuild = kReleaseMode,
   }) {
+    if (selfHosted) return; // backend self-hosté : aucune autorité d'URL imposée
     final effectiveProfile = configuredProfile ?? (productionFamily ? AppEnvironmentProfile.production : profile);
     final normalized = (configuredApiBaseUrl ?? apiBaseUrl ?? '').trim().replaceFirst(RegExp(r'/+$'), '');
     final expected = effectiveProfile.defaultApiBaseUrl.replaceFirst(
