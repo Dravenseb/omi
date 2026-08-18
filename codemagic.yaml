@@ -15,13 +15,13 @@ workflows:
     max_build_duration: 120
     integrations:
       # Nom donné à la clé API App Store Connect dans Codemagic (Teams > Integrations).
-      app_store_connect: pendant_asc
+      app_store_connect: pendant_limitless
     environment:
       ios_signing:
         distribution_type: app_store
         # Remplacer par le bundle ID réel : Codemagic ne substitue pas les
         # variables dans ce bloc, il est lu avant l'exécution des scripts.
-        bundle_identifier: com.dravenseb.pendant
+        bundle_identifier: com.CHANGEME.pendant
       groups:
         - pendant
       flutter: 3.44.5
