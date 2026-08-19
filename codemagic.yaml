@@ -134,7 +134,9 @@ workflows:
           echo "nb de lignes    : $(wc -l < "$KEY_FILE")"
           echo "12 premiers car : $(head -c 12 "$KEY_FILE")"
           echo "contient BEGIN  : $(grep -c BEGIN "$KEY_FILE" 2>/dev/null || echo 0)"
-          echo "sha256          : $(sha256sum "$KEY_FILE" | cut -d' ' -f1)"
+          # shasum et non sha256sum : ce dernier n'existe pas sur macOS, et
+          # l'empreinte attendue se serait imprimee vide.
+          echo "sha256          : $(shasum -a 256 "$KEY_FILE" | cut -d' ' -f1)"
           echo "--------------------"
           if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
             echo "cle non reconnue comme PEM, tentative de decodage base64"
