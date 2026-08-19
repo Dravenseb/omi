@@ -100,6 +100,29 @@ workflows:
             exit 1
           fi
 
+          # La cle .p8 est un PEM multiligne. Colle telle quelle dans une
+          # variable, elle perd parfois ses retours a la ligne, ce qui produit
+          # un jeton invalide : Apple repond alors 401 sans plus d'explication.
+          # On accepte donc aussi une version encodee en base64.
+          KEY_FILE=/tmp/asc_key.p8
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
+            echo "cle non reconnue comme PEM, tentative de decodage base64"
+            if base64 --decode "$KEY_FILE" > "$KEY_FILE.dec" 2>/dev/null && grep -q "BEGIN PRIVATE KEY" "$KEY_FILE.dec"; then
+              mv "$KEY_FILE.dec" "$KEY_FILE"
+              echo "decodage base64 reussi"
+            else
+              echo "ERREUR: APP_STORE_CONNECT_PRIVATE_KEY n'est ni un PEM ni du base64 valide."
+              exit 1
+            fi
+          fi
+          echo "cle .p8 : $(wc -l < "$KEY_FILE") lignes, marqueurs PEM: $(grep -c 'PRIVATE KEY' "$KEY_FILE")"
+          if [ "$(wc -l < "$KEY_FILE")" -lt 3 ]; then
+            echo "ERREUR: la cle tient sur moins de 3 lignes, ses retours a la ligne ont ete perdus."
+            echo "Recolle-la dans Codemagic en conservant les sauts de ligne, ou encode-la en base64."
+            exit 1
+          fi
+
           keychain initialize
           # Le build embarque trois applications : l'app, l'extension widget
           # (BatteryWidget) et l'app Watch (omiWatchApp), toutes deux integrees
@@ -111,7 +134,7 @@ workflows:
           # limite le nombre a trois par compte.
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.widget" "$BUNDLE_ID.watchapp"; do
             echo "== profil pour $ID"
-            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --certificate-key=@env:CERTIFICATE_PRIVATE_KEY --create
+            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key @file:$KEY_FILE --certificate-key=@env:CERTIFICATE_PRIVATE_KEY --create
           done
           keychain add-certificates
           xcode-project use-profiles
