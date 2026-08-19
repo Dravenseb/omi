@@ -10,6 +10,13 @@
 #   CERTIFICATE_PRIVATE_KEY  cle privee RSA au format PEM, generee une fois et
 #                            conservee telle quelle : elle identifie le
 #                            certificat de distribution Apple
+#   APP_STORE_CONNECT_ISSUER_ID       Issuer ID de la cle API App Store Connect
+#   APP_STORE_CONNECT_KEY_IDENTIFIER  Key ID de cette meme cle
+#   APP_STORE_CONNECT_PRIVATE_KEY     contenu du fichier .p8
+#
+# Ces trois dernieres sont lues directement par l'outil app-store-connect.
+# L'integration nommee ci-dessous sert a la publication, mais n'expose pas ses
+# identifiants aux scripts : sans elles, l'API Apple repond 401.
 
 workflows:
   pendant-testflight:
@@ -77,6 +84,22 @@ workflows:
       - name: Signature iOS
         script: |
           set -e
+          # Diagnostic : sans ces trois variables l'API Apple repond 401 et le
+          # message ne dit pas laquelle manque.
+          for V in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY; do
+            eval "VAL=\$$V"
+            if [ -z "$VAL" ]; then
+              echo "MANQUANTE: $V"
+              MANQUE=1
+            else
+              echo "presente: $V"
+            fi
+          done
+          if [ -n "$MANQUE" ]; then
+            echo "Ajouter ces variables au groupe 'pendant' dans Codemagic."
+            exit 1
+          fi
+
           keychain initialize
           # Le build embarque trois applications : l'app, l'extension widget
           # (BatteryWidget) et l'app Watch (omiWatchApp), toutes deux integrees
