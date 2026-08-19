@@ -138,6 +138,22 @@ workflows:
           # l'empreinte attendue se serait imprimee vide.
           echo "sha256          : $(shasum -a 256 "$KEY_FILE" | cut -d' ' -f1)"
           echo "--------------------"
+
+          # La cle .p8 est prouvee bonne (empreinte de reference verifiee hors
+          # ligne) et Apple repond quand meme 401 : restent l'Issuer ID et le
+          # Key ID. Etant masques dans les journaux, on compare leur empreinte
+          # a celle des valeurs connues valides plutot que leur contenu.
+          ISSUER="${PENDANT_ASC_ISSUER_ID:-$APP_STORE_CONNECT_ISSUER_ID}"
+          KEYID="${PENDANT_ASC_KEY_ID:-$APP_STORE_CONNECT_KEY_IDENTIFIER}"
+          empreinte() { printf '%s' "$1" | shasum -a 256 | cut -d' ' -f1; }
+          EI=$(empreinte "$ISSUER")
+          EK=$(empreinte "$KEYID")
+          echo "-- diagnostic identifiants --"
+          echo "issuer  : ${#ISSUER} car, sha256 $EI"
+          echo "key id  : ${#KEYID} car, sha256 $EK"
+          [ "$EI" = "d132728fa9b548c9deba10a85b44b2ad20ae15be6f9ac9cf1daea6f8c206fe17" ]             && echo "issuer  : CONFORME" || echo "issuer  : NON CONFORME"
+          [ "$EK" = "af722230ba237604f68b5c2b3085eca7b13fc5af2f7b3c9d334b232a0758e2c7" ]             && echo "key id  : CONFORME" || echo "key id  : NON CONFORME"
+          echo "-----------------------------"
           if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
             echo "cle non reconnue comme PEM, tentative de decodage base64"
             # Entree standard et non argument positionnel : le base64 de macOS
@@ -168,7 +184,7 @@ workflows:
           # limite le nombre a trois par compte.
           for ID in "$BUNDLE_ID" "$BUNDLE_ID.widget" "$BUNDLE_ID.watchapp"; do
             echo "== profil pour $ID"
-            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key @file:$KEY_FILE --certificate-key=@env:CERTIFICATE_PRIVATE_KEY --create
+            app-store-connect fetch-signing-files "$ID" --type IOS_APP_STORE --issuer-id "$ISSUER" --key-id "$KEYID" --private-key @file:$KEY_FILE --certificate-key=@env:CERTIFICATE_PRIVATE_KEY --create
           done
           keychain add-certificates
           xcode-project use-profiles
