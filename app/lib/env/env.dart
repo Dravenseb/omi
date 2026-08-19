@@ -96,6 +96,7 @@ abstract class Env {
     required String projectId,
     AppEnvironmentProfile? configuredProfile,
   }) {
+    if (selfHosted) return; // backend self-hoste : projet Firebase libre
     final effectiveProfile = configuredProfile ?? profile;
     if (projectId != effectiveProfile.firebaseProjectId) {
       throw StateError(
