@@ -11,8 +11,13 @@
 #                            conservee telle quelle : elle identifie le
 #                            certificat de distribution Apple
 #   APP_STORE_CONNECT_ISSUER_ID       Issuer ID de la cle API App Store Connect
-#   APP_STORE_CONNECT_KEY_IDENTIFIER  Key ID de cette meme cle
-#   APP_STORE_CONNECT_PRIVATE_KEY     contenu du fichier .p8
+#   APP_STORE_CONNECT_KEY_IDENTIFIER  Key ID de cette meme cle (ex. F3DXCK9947)
+#   PENDANT_ASC_KEY_B64               le fichier .p8 encode en base64, sur UNE
+#                                     ligne. Nom volontairement distinct des
+#                                     variables APP_STORE_CONNECT_* que
+#                                     l'integration peuple, pour eviter tout
+#                                     masquage. (APP_STORE_CONNECT_PRIVATE_KEY
+#                                     reste accepte en repli.)
 #
 # Ces trois dernieres sont lues directement par l'outil app-store-connect.
 # L'integration nommee ci-dessous sert a la publication, mais n'expose pas ses
@@ -104,9 +109,33 @@ workflows:
           # variable, elle perd parfois ses retours a la ligne, ce qui produit
           # un jeton invalide : Apple repond alors 401 sans plus d'explication.
           # On accepte donc aussi une version encodee en base64.
+          # Recreer APP_STORE_CONNECT_PRIVATE_KEY dans le groupe ne changeait
+          # jamais les 98 octets recus : la valeur effective ne venait donc PAS
+          # du groupe. L'integration app_store_connect peuple aussi les variables
+          # APP_STORE_CONNECT_* au moment du build et peut masquer celle du groupe.
+          # Parade : lire une variable au nom unique (impossible a masquer) et la
+          # passer en flag explicite --private-key, qui prime sur l'environnement.
           KEY_FILE=/tmp/asc_key.p8
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
-          echo "valeur recue : $(wc -c < "$KEY_FILE") caracteres"
+          if [ -n "$PENDANT_ASC_KEY_B64" ]; then
+            echo "source cle : PENDANT_ASC_KEY_B64"
+            printf '%s' "$PENDANT_ASC_KEY_B64" > "$KEY_FILE"
+          else
+            echo "source cle : APP_STORE_CONNECT_PRIVATE_KEY (repli)"
+            printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
+          fi
+          # --- Empreinte de la valeur recue (ne divulgue pas le corps de la cle) ---
+          # La valeur CORRECTE (fichier AuthKey_F3DXCK9947) doit donner l'une des
+          # deux empreintes suivantes ; toute autre signifie que la variable
+          # APP_STORE_CONNECT_PRIVATE_KEY ne contient pas la bonne cle :
+          #   base64 344 car -> sha256 7d13f00c622af0f29a47373349d36e94d407a4bc43a19996b35b8e03d30bd0ea
+          #   PEM   257 oct  -> sha256 d37a752e936b6175d3639358a2253f4dea0987fa277dbfbd36199dc6d5e39aa1
+          echo "-- diagnostic cle --"
+          echo "longueur        : $(wc -c < "$KEY_FILE") octets"
+          echo "nb de lignes    : $(wc -l < "$KEY_FILE")"
+          echo "12 premiers car : $(head -c 12 "$KEY_FILE")"
+          echo "contient BEGIN  : $(grep -c BEGIN "$KEY_FILE" 2>/dev/null || echo 0)"
+          echo "sha256          : $(sha256sum "$KEY_FILE" | cut -d' ' -f1)"
+          echo "--------------------"
           if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
             echo "cle non reconnue comme PEM, tentative de decodage base64"
             # Entree standard et non argument positionnel : le base64 de macOS
@@ -115,7 +144,7 @@ workflows:
               mv "$KEY_FILE.dec" "$KEY_FILE"
               echo "decodage base64 reussi"
             else
-              echo "ERREUR: APP_STORE_CONNECT_PRIVATE_KEY n'est ni un PEM ni du base64 valide."
+              echo "ERREUR: la cle .p8 (PENDANT_ASC_KEY_B64) n'est ni un PEM ni du base64 valide."
               exit 1
             fi
           fi
