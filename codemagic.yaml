@@ -106,9 +106,12 @@ workflows:
           # On accepte donc aussi une version encodee en base64.
           KEY_FILE=/tmp/asc_key.p8
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
+          echo "valeur recue : $(wc -c < "$KEY_FILE") caracteres"
           if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
             echo "cle non reconnue comme PEM, tentative de decodage base64"
-            if base64 --decode "$KEY_FILE" > "$KEY_FILE.dec" 2>/dev/null && grep -q "BEGIN PRIVATE KEY" "$KEY_FILE.dec"; then
+            # Entree standard et non argument positionnel : le base64 de macOS
+            # n'accepte pas de nom de fichier en argument.
+            if base64 --decode < "$KEY_FILE" > "$KEY_FILE.dec" 2>/dev/null && grep -q "BEGIN PRIVATE KEY" "$KEY_FILE.dec"; then
               mv "$KEY_FILE.dec" "$KEY_FILE"
               echo "decodage base64 reussi"
             else
