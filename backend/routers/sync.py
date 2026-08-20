@@ -1109,31 +1109,12 @@ async def sync_local_files_v2(
         owned_paths = list(paths)
         paths = []  # Prevent finally cleanup of files now owned by bg task
 
-        if lane_decision.lane == SyncLane.BACKFILL and not cloud_task_eligible:
-            # Fail closed: backfill may run only on the dedicated queue/service.
-            # BYOK cannot be serialized into Cloud Tasks, so it is retained on
-            # device until an isolated BYOK path exists.
-            await run_blocking(sync_executor, _cleanup_files, owned_paths)
-            await _finalize_sync_job_failure(
-                job_id=job_id,
-                uid=uid,
-                content_id=content_id,
-                error_code='sync_backfill_dispatch_unavailable',
-                outcome=TranscriptionOutcome.CONFIG_ERROR,
-                provider='unknown',
-                model='unknown',
-                lane=lane_decision.lane.value,
-            )
-            await run_blocking(db_executor, release_backfill_slot, uid, job_id)
-            backfill_slot_acquired = False
-            return JSONResponse(
-                status_code=503,
-                headers={'Retry-After': '30', 'X-Omi-Rate-Limit-Reason': 'backfill_capacity'},
-                content={
-                    'code': 'backfill_capacity',
-                    'detail': 'Historical recovery is temporarily unavailable; local audio was not consumed',
-                },
-            )
+        # PATCH (self-host, single-user, no Cloud Tasks queue): upstream fails
+        # closed here because a multi-tenant deployment can't safely run
+        # backfill inline (fair-use/cost control across users). That doesn't
+        # apply to a personal deployment, so backfill just falls through to
+        # the same inline pipeline fresh/BYOK already use below. See
+        # config/sync-backfill-inline.patch.
 
         dispatched = False
         # Fresh BYOK requests retain the legacy inline path. Backfill was

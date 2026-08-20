@@ -21,11 +21,17 @@ logger = logging.getLogger(__name__)
 # SDK boundary. Downstream callers narrow results via the adapter pattern.
 _redis_host: Optional[str] = os.getenv('REDIS_DB_HOST')
 _redis_port_env: Optional[str] = os.getenv('REDIS_DB_PORT')
+# Les Redis manages (Upstash, Redis Cloud) n'acceptent que du TLS et coupent
+# la connexion sans TLS ; un Redis local en reseau prive n'en a pas. D'ou le
+# reglage par variable, false par defaut pour ne rien changer aux deploiements
+# existants.
+_redis_ssl: bool = os.getenv('REDIS_DB_SSL', 'false').strip().lower() in ('1', 'true', 'yes')
 r: Any = redis.Redis(
     host=cast(str, _redis_host),
     port=int(_redis_port_env) if _redis_port_env is not None else 6379,
     username='default',
     password=os.getenv('REDIS_DB_PASSWORD'),
+    ssl=_redis_ssl,
     health_check_interval=30,
 )
 
