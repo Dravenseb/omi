@@ -1,4 +1,4 @@
-ARG PYTHON_BASE_IMAGE=gcr.io/based-hardware-dev/python:3.11-slim-forky
+ARG PYTHON_BASE_IMAGE=python:3.11-slim
 ARG UV_VERSION=0.11.13
 
 FROM ${PYTHON_BASE_IMAGE} AS builder
